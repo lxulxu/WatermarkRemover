@@ -2,10 +2,12 @@
 通过手动框选区域去除视频中位置固定的水印和字幕，项目基于Python3.7。
 
 ## 效果
-
-![原始帧]('https://github.com/lxulxu/WatermarkRemover/blob/master/image/origin.jpg')
-![去除水印]('https://github.com/lxulxu/WatermarkRemover/blob/master/image/no_watermark.jpg')
-![去除字幕]('https://github.com/lxulxu/WatermarkRemover/blob/master/image/no_sub.jpg')
+- 原始帧
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_sub.jpg'></a>
+- 去除水印
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_watermark.jpg'></a>
+- 去除字幕
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_sub.jpg'></a>
 
 ## 如何使用
 

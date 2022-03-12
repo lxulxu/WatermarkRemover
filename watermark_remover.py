@@ -5,6 +5,10 @@ import cv2
 import numpy
 from moviepy import editor
 
+VIDEO_PATH = 'video'
+OUTPUT_PATH = 'output'
+TEMP_VIDEO = 'temp.mp4'
+
 class WatermarkRemover():
   
   def __init__(self, threshold: int, kernel_size: int):
@@ -17,7 +21,7 @@ class WatermarkRemover():
     :param img: 显示图片
     :return: 框选区域坐标
     '''
-    COFF = 0.5
+    COFF = 0.7
     w, h = int(COFF * img.shape[1]), int(COFF * img.shape[0])
     resize_img = cv2.resize(img, (w, h))
     roi = cv2.selectROI(hint, resize_img, False, False)
@@ -116,76 +120,90 @@ class WatermarkRemover():
         clip = opencv_video.set_audio(audio)
         clip.to_videofile(output_path)
 
-  def remove_video_watermark(self, input_path: str):
+  def remove_video_watermark(self):
     '''
     去除视频水印
-    :param input_path: 视频文件路径
     '''
-    #生成水印蒙版
-    mask = self.generate_watermark_mask(input_path)
+    if not os.path.exists(OUTPUT_PATH):
+      os.makedirs(OUTPUT_PATH)
 
-    #创建待写入文件对象
-    video = cv2.VideoCapture(input_path)
-    fps = video.get(cv2.CAP_PROP_FPS)
-    size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    temp_path = 'temp.mp4'
-    video_writer = cv2.VideoWriter(temp_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+    filenames = [os.path.join(VIDEO_PATH, i) for i in os.listdir(VIDEO_PATH)]
+    mask = None
+
+    for i, name in enumerate(filenames):
+      if i == 0:
+        #生成水印蒙版
+        mask = self.generate_watermark_mask(name)
+
+      #创建待写入文件对象
+      video = cv2.VideoCapture(name)
+      fps = video.get(cv2.CAP_PROP_FPS)
+      size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+      video_writer = cv2.VideoWriter(TEMP_VIDEO, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
     
-    #逐帧处理图像
-    success, frame = video.read()
-
-    while success:
-      frame = self.inpaint_image(frame, mask)
-      video_writer.write(frame)
+      #逐帧处理图像
       success, frame = video.read()
 
-    video.release()
-    video_writer.release()
+      while success:
+        frame = self.inpaint_image(frame, mask)
+        video_writer.write(frame)
+        success, frame = video.read()
 
-    #封装视频
-    (_, filename) = os.path.split(input_path)
-    output_path = filename.split('.')[0] + '_no_watermark.mp4'#输出文件路径
-    self.merge_audio(input_path, output_path, temp_path)
-    os.remove(temp_path)
+      video.release()
+      video_writer.release()
 
-  def remove_video_subtitle(self, input_path: str):
+      #封装视频
+      (_, filename) = os.path.split(name)
+      output_path = os.path.join(OUTPUT_PATH, filename.split('.')[0] + '_no_watermark.mp4')#输出文件路径
+      self.merge_audio(name, output_path, TEMP_VIDEO)
+  
+  if os.path.exists(TEMP_VIDEO):
+    os.remove(TEMP_VIDEO)
+
+  def remove_video_subtitle(self):
     '''
     去除视频字幕
-    :param input_path: 视频文件路径
     '''
-    #创建待写入文件对象
-    video = cv2.VideoCapture(input_path)
-    fps = video.get(cv2.CAP_PROP_FPS)
-    size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    temp_path = 'temp.mp4'
-    video_writer = cv2.VideoWriter(temp_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+    if not os.path.exists(OUTPUT_PATH):
+      os.makedirs(OUTPUT_PATH)
+
+    filenames = [os.path.join(VIDEO_PATH, i) for i in os.listdir(VIDEO_PATH)]
+    roi = []
+
+    for i, name in enumerate(filenames):
+      #创建待写入文件对象
+      video = cv2.VideoCapture(name)
+      fps = video.get(cv2.CAP_PROP_FPS)
+      size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+      video_writer = cv2.VideoWriter(TEMP_VIDEO, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
     
-    #逐帧处理图像
-    success, frame = video.read()
-    roi = self.select_roi(frame, 'select subtitle ROI')
-
-    while success:
-      mask = self.generate_subtitle_mask(frame, roi)
-      frame = self.inpaint_image(frame, mask)
-      video_writer.write(frame)
+      #逐帧处理图像
       success, frame = video.read()
+      if i == 0:
+        roi = self.select_roi(frame, 'select subtitle ROI')
 
-    video.release()
-    video_writer.release()
+      while success:
+        mask = self.generate_subtitle_mask(frame, roi)
+        frame = self.inpaint_image(frame, mask)
+        video_writer.write(frame)
+        success, frame = video.read()
 
-    #封装视频
-    (_, filename) = os.path.split(input_path)
-    output_path = filename.split('.')[0] + '_no_sub.mp4'#输出文件路径
-    self.merge_audio(input_path, output_path, temp_path)
-    os.remove(temp_path)
+      video.release()
+      video_writer.release()
+
+      #封装视频
+      (_, filename) = os.path.split(name)
+      output_path = os.path.join(OUTPUT_PATH, filename.split('.')[0] + '_no_sub.mp4')#输出文件路径
+      self.merge_audio(name, output_path, TEMP_VIDEO)
+
+    if os.path.exists(TEMP_VIDEO):
+      os.remove(TEMP_VIDEO)
 
 if __name__ == '__main__':
-  video_path = './video.mp4'#视频文件路径
-
   #去除视频水印
   remover = WatermarkRemover(threshold=80, kernel_size=5)
-  remover.remove_video_watermark(video_path)
+  remover.remove_video_watermark()
 
   #去除视频字幕
   remover = WatermarkRemover(threshold=80, kernel_size=10)
-  remover.remove_video_subtitle(video_path)
+  remover.remove_video_subtitle()

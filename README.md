@@ -3,7 +3,7 @@
 
 ## 效果
 - 原始帧
-<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_sub.jpg'></a>
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/origin.jpg'></a>
 - 去除水印
 <a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_watermark.jpg'></a>
 - 去除字幕

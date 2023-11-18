@@ -1,209 +1,110 @@
-import os
-import sys
-
 import cv2
-import numpy
-from moviepy import editor
+import numpy as np
+import glob
+from moviepy.editor import VideoFileClip
+import os
+from tqdm import tqdm
 
-VIDEO_PATH = 'video'
-OUTPUT_PATH = 'output'
-TEMP_VIDEO = 'temp.mp4'
+def ensure_directory_exists(directory):
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        except OSError as error:
+            print(f"Error creating directory {directory}: {error}")
+            raise
 
-class WatermarkRemover():
-  
-  def __init__(self, threshold: int, kernel_size: int):
-    self.threshold = threshold #阈值分割所用阈值
-    self.kernel_size = kernel_size #膨胀运算核尺寸
-  
-  def select_roi(self, img: numpy.ndarray, hint: str) -> list:
-    '''
-    框选水印或字幕位置，SPACE或ENTER键退出
-    :param img: 显示图片
-    :return: 框选区域坐标
-    '''
-    COFF = 0.7
-    w, h = int(COFF * img.shape[1]), int(COFF * img.shape[0])
-    resize_img = cv2.resize(img, (w, h))
-    roi = cv2.selectROI(hint, resize_img, False, False)
+def is_valid_video_file(file):
+    try:
+        with VideoFileClip(file) as video_clip:
+            return True
+    except Exception as e:
+        print(f"Invalid video file: {file}, Error: {e}")
+        return False
+
+def get_first_valid_frame(video_clip, threshold=10, num_frames=10):
+    total_frames = int(video_clip.fps * video_clip.duration)
+    frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+
+    for idx in frame_indices:
+        frame = video_clip.get_frame(idx / video_clip.fps)
+        if frame.mean() > threshold:
+            return frame
+
+    return video_clip.get_frame(0)
+
+def select_roi_for_mask(video_clip):
+    frame = get_first_valid_frame(video_clip)
+
+    # 将视频帧调整为720p显示
+    display_height = 720
+    scale_factor = display_height / frame.shape[0]
+    display_width = int(frame.shape[1] * scale_factor)
+    display_frame = cv2.resize(frame, (display_width, display_height))
+
+    instructions = "Select ROI and press SPACE or ENTER"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(display_frame, instructions, (10, 30), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+    r = cv2.selectROI(display_frame)
     cv2.destroyAllWindows()
-    watermark_roi = [int(roi[0] / COFF), int(roi[1] / COFF), int(roi[2] / COFF), int(roi[3] / COFF)]
-    return watermark_roi
 
-  def dilate_mask(self, mask: numpy.ndarray) -> numpy.ndarray:
-    
-    '''
-    对蒙版进行膨胀运算
-    :param mask: 蒙版图片
-    :return: 膨胀处理后蒙版
-    '''
-    kernel = numpy.ones((self.kernel_size, self.kernel_size), numpy.uint8)
-    mask = cv2.dilate(mask, kernel)
+    r_original = (int(r[0] / scale_factor), int(r[1] / scale_factor), int(r[2] / scale_factor), int(r[3] / scale_factor))
+
+    return r_original
+
+def detect_watermark_adaptive(frame, roi):
+    roi_frame = frame[roi[1]:roi[1] + roi[3], roi[0]:roi[0] + roi[2]]
+    gray_frame = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
+    _, binary_frame = cv2.threshold(gray_frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    mask = np.zeros_like(frame[:, :, 0], dtype=np.uint8)
+    mask[roi[1]:roi[1] + roi[3], roi[0]:roi[0] + roi[2]] = binary_frame
+
     return mask
 
-  def generate_single_mask(self, img: numpy.ndarray, roi: list, threshold: int) -> numpy.ndarray:
-    '''
-    通过手动选择的ROI区域生成单帧图像的水印蒙版
-    :param img: 单帧图像
-    :param roi: 手动选择区域坐标
-    :param threshold: 二值化阈值
-    :return: 水印蒙版
-    '''
-    #区域无效，程序退出
-    if len(roi) != 4:
-      print('NULL ROI!')
-      sys.exit()
+def generate_watermark_mask(video_clip, num_frames=10, min_frame_count=7):
+    total_frames = int(video_clip.duration * video_clip.fps)
+    frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+
+    frames = [video_clip.get_frame(idx / video_clip.fps) for idx in frame_indices]
+    r_original = select_roi_for_mask(video_clip)
+
+    masks = [detect_watermark_adaptive(frame, r_original) for frame in frames]
+
+    final_mask = sum((mask == 255).astype(np.uint8) for mask in masks)
+    # 根据像素点在至少min_frame_count张以上的帧中的出现来生成最终的遮罩
+    final_mask = np.where(final_mask >= min_frame_count, 255, 0).astype(np.uint8)
+
+    kernel = np.ones((5, 5), np.uint8)
+    return cv2.dilate(final_mask, kernel)
+
+def process_video(video_clip, output_path, apply_mask_func):
+    total_frames = int(video_clip.duration * video_clip.fps)
+    progress_bar = tqdm(total=total_frames, desc="Processing Frames", unit="frames")
+
+    def process_frame(frame):
+        result = apply_mask_func(frame)
+        progress_bar.update(1000)
+        return result
     
-    #复制单帧灰度图像ROI内像素点
-    roi_img = numpy.zeros((img.shape[0], img.shape[1]), numpy.uint8)
-    start_x, end_x = int(roi[1]), int(roi[1] + roi[3])
-    start_y, end_y = int(roi[0]), int(roi[0] + roi[2])
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    roi_img[start_x:end_x, start_y:end_y] = gray[start_x:end_x, start_y:end_y]
+    processed_video = video_clip.fl_image(process_frame, apply_to=["each"])
+    processed_video.write_videofile(f"{output_path}.mp4", codec="libx264")
 
-    #阈值分割
-    _, mask = cv2.threshold(roi_img, threshold, 255, cv2.THRESH_BINARY)
-    return mask
+if __name__ == "__main__":
+    output_dir = "output"
+    ensure_directory_exists(output_dir)
+    videos = [f for f in glob.glob("video/*") if is_valid_video_file(f)]
 
-  def generate_watermark_mask(self, video_path: str) -> numpy.ndarray:
-    '''
-    截取视频中多帧图像生成多张水印蒙版，通过逻辑与计算生成最终水印蒙版
-    :param video_path: 视频文件路径
-    :return: 水印蒙版
-    '''
-    video = cv2.VideoCapture(video_path)
-    success, frame = video.read()
-    roi = self.select_roi(frame, 'select watermark ROI')
-    mask = numpy.ones((frame.shape[0], frame.shape[1]), numpy.uint8)
-    mask.fill(255)
+    watermark_mask = None
 
-    step = video.get(cv2.CAP_PROP_FRAME_COUNT) // 5
-    index = 0
-    while success:
-      if index % step == 0:
-        mask = cv2.bitwise_and(mask, self.generate_single_mask(frame, roi, self.threshold))
-      success, frame = video.read()
-      index += 1
-    video.release()
+    for video in videos:
+        video_clip = VideoFileClip(video)
+        if watermark_mask is None:
+            watermark_mask = generate_watermark_mask(video_clip)
 
-    return self.dilate_mask(mask)
-
-  def generate_subtitle_mask(self, frame: numpy.ndarray, roi: list) -> numpy.ndarray:
-    '''
-    通过手动选择ROI区域生成单帧图像字幕蒙版
-    :param frame: 单帧图像
-    :param roi: 手动选择区域坐标
-    :return: 字幕蒙版
-    '''
-    mask = self.generate_single_mask(frame, [0, roi[1], frame.shape[1], roi[3]], self.threshold) #仅使用ROI横坐标区域
-    return self.dilate_mask(mask)
-
-  def inpaint_image(self, img: numpy.ndarray, mask: numpy.ndarray) -> numpy.ndarray:
-    '''
-    修复图像
-    :param img: 单帧图像
-    :parma mask: 蒙版
-    :return: 修复后图像
-    '''
-    telea = cv2.inpaint(img, mask, 1, cv2.INPAINT_TELEA)
-    return telea
-  
-  def merge_audio(self, input_path: str, output_path: str, temp_path: str):
-    '''
-    合并音频与处理后视频
-    :param input_path: 原视频文件路径
-    :param output_path: 封装音视频后文件路径
-    :param temp_path: 无声视频文件路径 
-    '''
-    with editor.VideoFileClip(input_path) as video:
-      audio = video.audio
-      with editor.VideoFileClip(temp_path) as opencv_video:
-        clip = opencv_video.set_audio(audio)
-        clip.to_videofile(output_path)
-
-  def remove_video_watermark(self):
-    '''
-    去除视频水印
-    '''
-    if not os.path.exists(OUTPUT_PATH):
-      os.makedirs(OUTPUT_PATH)
-
-    filenames = [os.path.join(VIDEO_PATH, i) for i in os.listdir(VIDEO_PATH)]
-    mask = None
-
-    for i, name in enumerate(filenames):
-      if i == 0:
-        #生成水印蒙版
-        mask = self.generate_watermark_mask(name)
-
-      #创建待写入文件对象
-      video = cv2.VideoCapture(name)
-      fps = video.get(cv2.CAP_PROP_FPS)
-      size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-      video_writer = cv2.VideoWriter(TEMP_VIDEO, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
-    
-      #逐帧处理图像
-      success, frame = video.read()
-
-      while success:
-        frame = self.inpaint_image(frame, mask)
-        video_writer.write(frame)
-        success, frame = video.read()
-
-      video.release()
-      video_writer.release()
-
-      #封装视频
-      (_, filename) = os.path.split(name)
-      output_path = os.path.join(OUTPUT_PATH, filename.split('.')[0] + '_no_watermark.mp4')#输出文件路径
-      self.merge_audio(name, output_path, TEMP_VIDEO)
-  
-  if os.path.exists(TEMP_VIDEO):
-    os.remove(TEMP_VIDEO)
-
-  def remove_video_subtitle(self):
-    '''
-    去除视频字幕
-    '''
-    if not os.path.exists(OUTPUT_PATH):
-      os.makedirs(OUTPUT_PATH)
-
-    filenames = [os.path.join(VIDEO_PATH, i) for i in os.listdir(VIDEO_PATH)]
-    roi = []
-
-    for i, name in enumerate(filenames):
-      #创建待写入文件对象
-      video = cv2.VideoCapture(name)
-      fps = video.get(cv2.CAP_PROP_FPS)
-      size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-      video_writer = cv2.VideoWriter(TEMP_VIDEO, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
-    
-      #逐帧处理图像
-      success, frame = video.read()
-      if i == 0:
-        roi = self.select_roi(frame, 'select subtitle ROI')
-
-      while success:
-        mask = self.generate_subtitle_mask(frame, roi)
-        frame = self.inpaint_image(frame, mask)
-        video_writer.write(frame)
-        success, frame = video.read()
-
-      video.release()
-      video_writer.release()
-
-      #封装视频
-      (_, filename) = os.path.split(name)
-      output_path = os.path.join(OUTPUT_PATH, filename.split('.')[0] + '_no_sub.mp4')#输出文件路径
-      self.merge_audio(name, output_path, TEMP_VIDEO)
-
-    if os.path.exists(TEMP_VIDEO):
-      os.remove(TEMP_VIDEO)
-
-if __name__ == '__main__':
-  #去除视频水印
-  remover = WatermarkRemover(threshold=80, kernel_size=5)
-  remover.remove_video_watermark()
-
-  #去除视频字幕
-  remover = WatermarkRemover(threshold=80, kernel_size=10)
-  remover.remove_video_subtitle()
+        mask_func = lambda frame: cv2.inpaint(frame, watermark_mask, 3, cv2.INPAINT_NS)
+        video_name = os.path.basename(video)
+        output_video_path = os.path.join(output_dir, os.path.splitext(video_name)[0])
+        process_video(video_clip, output_video_path, mask_func)
+        print(f"Successfully processed {video_name}")

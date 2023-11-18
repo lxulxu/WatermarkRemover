@@ -1,3 +1,4 @@
 moviepy==1.0.3
-numpy==1.21.5
-opencv_python==4.5.5.62
+numpy==1.26.0
+opencv_python==4.8.1.78
+tqdm==4.66.1

@@ -12,5 +12,12 @@
 ### 1. 安装依赖：
   `pip install -r requirements.txt`
 
-### 2. 运行程序
-待处理视频放在`video`文件夹下，所有视频尺寸须保持一致，鼠标框选水印对应区域后按**SPACE**或**ENTER**键，处理后视频在`output`文件夹下，格式为mp4。
+### 2. 准备视频文件
+待处理视频放在`video`文件夹下，所有视频尺寸须保持一致。
+
+### 3. 运行程序
+```bash
+python watermark_remover.py
+```
+### 4.选择水印区域
+鼠标框选水印对应区域后按**SPACE**或**ENTER**键，处理后视频在`output`文件夹下，格式为mp4。

@@ -2,7 +2,11 @@
 通过手动框选区域批量去除多个视频中位置固定的某个水印，项目基于Python 3.12。
 
 ## 效果
-<iframe frameborder="0" class="juxtapose" width="100%" height="540" src="https://cdn.knightlab.com/libs/juxtapose/latest/embed/index.html?uid=3db06fcc-a8aa-11ef-9397-d93975fe8866"></iframe>
+- 原始帧
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/origin.jpg'></a>
+- 去除水印
+<a href=''><img src='https://raw.githubusercontent.com/lxulxu/WatermarkRemover/master/image/no_watermark.jpg'></a>
+
 
 ## 如何使用
 

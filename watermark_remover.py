@@ -4,6 +4,7 @@ import glob
 from moviepy.editor import VideoFileClip
 import os
 from tqdm import tqdm
+import argparse
 
 def ensure_directory_exists(directory):
     if not os.path.exists(directory):
@@ -79,7 +80,17 @@ def generate_watermark_mask(video_clip, num_frames=10, min_frame_count=7):
     kernel = np.ones((5, 5), np.uint8)
     return cv2.dilate(final_mask, kernel)
 
-def process_video(video_clip, output_path, apply_mask_func):
+def process_video(video_clip, output_path, apply_mask_func, file_ext='mp4', audio_ext=None, threads=None, audio_codec=None, crf=23):
+    # Convert threads from integer to string unless None
+    if(threads != None):
+        threads = str(threads)
+    # Create list of FFMPEG parameters
+    ffmpeg_params = ['-crf',str(crf)]
+    # If there is a specified file extension for audio, add it to parameter list
+    if(audio_ext != None):
+        ffmpeg_params.append('-c:a')
+        ffmpeg_params.append(audio_ext)
+
     total_frames = int(video_clip.duration * video_clip.fps)
     progress_bar = tqdm(total=total_frames, desc="Processing Frames", unit="frames")
 
@@ -89,9 +100,21 @@ def process_video(video_clip, output_path, apply_mask_func):
         return result
     
     processed_video = video_clip.fl_image(process_frame, apply_to=["each"])
-    processed_video.write_videofile(f"{output_path}.mp4", codec="libx264")
+    processed_video.write_videofile(f"{output_path}.{file_ext}", codec="libx264", threads=threads, audio_codec=audio_codec, ffmpeg_params=ffmpeg_params)
 
 if __name__ == "__main__":
+    # Parse input arguments
+    parser = argparse.ArgumentParser("watermark_remover.py")
+    # TODO: Add all file types that support x264 codec to choices
+    parser.add_argument('-e', '--file_ext', required=False, choices=['mp4','mkv'], help='File extension to save output video with. Default: mp4', default='mp4')
+    parser.add_argument('-c', '--crf', required=False, type=int, choices=range(0,51+1), metavar="[0,51]", help='Quality of output video. 0 is lossless, whereas 51 has the lowest bitrate. Default: 23', default=23)
+    # TODO: Added range so number of threads cannot be <1, but 99 is an arbitrary upper limit
+    parser.add_argument('-t', '--threads', required=False, type=int, choices=range(1,100), metavar="[1,99]", help='Number of threads to process output video with. Should be 2x the number of your CPU cores. Default: None (Allows MoviePy to decide)', default=None)
+    parser.add_argument('-ac', '--audio_codec', required=False, choices=['libmp3lame','libvorbis','libfdk_aac','pcm_s16le','pcm_s32le'], help='Codec for audio in output video. Default: None (Allows MoviePy to decide)', default=None)
+    # TODO: Add all audio file types supported by above codecs
+    parser.add_argument('-ae', '--audio_ext', required=False, choices=['mp3','aac','wav','flac'], help='File extension for audio in output video. Choose a format supported by your selected codec. Default: None (Allows FFMPEG to decide)', default=None)
+    args = vars(parser.parse_args())
+
     output_dir = "output"
     ensure_directory_exists(output_dir)
     videos = [f for f in glob.glob("video/*") if is_valid_video_file(f)]
@@ -106,5 +129,5 @@ if __name__ == "__main__":
         mask_func = lambda frame: cv2.inpaint(frame, watermark_mask, 3, cv2.INPAINT_NS)
         video_name = os.path.basename(video)
         output_video_path = os.path.join(output_dir, os.path.splitext(video_name)[0])
-        process_video(video_clip, output_video_path, mask_func)
+        process_video(video_clip, output_video_path, mask_func, threads=args['threads'], audio_ext=args['audio_ext'], audio_codec=args['audio_codec'], file_ext=args['file_ext'], crf=args['crf'])
         print(f"Successfully processed {video_name}")

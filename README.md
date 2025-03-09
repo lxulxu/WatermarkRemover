@@ -109,3 +109,9 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 
 **Q: 安装CUDA后出现错误？**
  A: 确保安装的CUDA、cuDNN和PyTorch版本相互兼容。参考PyTorch官方网站的兼容性表格。
+
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=lxulxu/WatermarkRemover&type=Date)](https://star-history.com/#lxulxu/WatermarkRemover&Date)

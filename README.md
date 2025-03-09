@@ -16,14 +16,14 @@
 
 ## 安装步骤
 
-1. 克隆仓库
+- 克隆仓库
 
 ```bash
 git clone https://github.com/lxulxu/WatermarkRemover.git
 cd WatermarkRemover
 ```
 
-1. 创建并激活虚拟环境（推荐）
+- 创建并激活虚拟环境（可选，推荐）
 
 ```bash
 python -m venv venv
@@ -31,11 +31,41 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-1. 安装依赖
+- 安装基础依赖
 
 ```bash
 pip install -r requirements.txt
 ```
+
+- 安装PyTorch（二选一）
+
+  1. CPU版本
+
+    ```bash
+    pip install torch
+    ```
+  
+  2. GPU版本（需要NVIDIA显卡）
+
+      - 安装CUDA Toolkit
+
+	      访问 [NVIDIA CUDA下载页面](https://developer.nvidia.com/cuda-downloads)，选择对应的操作系统和版本。
+
+      - 安装cuDNN
+  
+        访问 [NVIDIA cuDNN下载页面](https://developer.nvidia.com/cudnn-downloads)，选择与CUDA版本匹配的cuDNN。
+
+	    - 安装GPU版本的PyTorch
+
+         访问 [PyTorch官方网站](https://pytorch.org/get-started/locally/)，选择与CUDA版本匹配的命令安装，例如：
+  
+         ```bash
+          pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+         ```
+  
+
+
+​	程序会自动检测是否有可用的GPU输出相关信息并自动选择处理方式。
 
 ## 使用方法
 
@@ -63,14 +93,10 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 
 ## 工作流程
 
-1. **水印区域选择**：程序会显示视频的第一帧，手动框选水印区域后按**SPACE**或**ENTER**键继续。
-2. **效果预览**（可选）：显示处理效果预览，用户可按**SPACE**或**ENTER**键确认或按**ESC**键取消退出程序。
+1. **水印区域选择**：程序会显示视频一帧，手动框选水印区域后按**SPACE**或**ENTER**键继续。
+2. **效果预览**（可选）：显示处理效果预览，按**SPACE**或**ENTER**键确认或按**ESC**键取消退出程序。
 3. **视频处理**：初次运行程序使用LAMA模型需较长时间下载模型。
 4. **输出结果**
-
-## 性能说明
-
-- 处理一个640x320的5秒视频大约需要14秒（处理速度会受到视频分辨率、CPU性能和所选区域大小的影响）
 
 ## 局限性
 
@@ -78,25 +104,7 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 - 同一批处理的视频尺寸必须一致
 - 同一批处理的视频水印必须一致
 
-## 高级配置
-
-程序内部包含一些可调整的参数：
-
-- `cache_size`：帧缓存大小，影响内存使用和处理速度
-- `similarity_threshold`：相似帧判定阈值
-- `keyframe_interval`：关键帧间隔，影响处理质量和速度
-- `scene_change_threshold`：场景变化检测阈值
-
-这些参数可以在代码中调整以适应不同的使用场景。
-
 ## 常见问题
 
-**Q: 程序处理速度很慢，如何加快？**
- A: 尝试减小水印区域大小，增加缓存大小和关键帧间隔。
-
-**Q: 处理后的视频有闪烁现象？**
- A: 尝试降低场景变化阈值和增加关键帧频率。
-
-**Q: 水印没有完全去除？**
- A: 尝试在选择区域时包含更大的水印边缘区域，或调整水印掩码生成的参数。
-
+**Q: 安装CUDA后出现错误？**
+ A: 确保安装的CUDA、cuDNN和PyTorch版本相互兼容。参考PyTorch官方网站的兼容性表格。

@@ -10,88 +10,11 @@ from lama_cleaner.model_manager import ModelManager
 from lama_cleaner.schema import Config, HDStrategy
 import time
 from datetime import timedelta
-import imagehash
-from PIL import Image
 import numpy as np
+import torch
 
-class FrameCache:
-    def __init__(self, cache_size=100, similarity_threshold=5):
-        self.cache = {}
-        self.cache_size = cache_size
-        self.similarity_threshold = similarity_threshold
-        self.access_count = {}
-    
-    def compute_hash(self, roi):
-        small_roi = cv2.resize(roi, (64, 64))
-        pil_image = Image.fromarray(cv2.cvtColor(small_roi, cv2.COLOR_BGR2RGB))
-        return imagehash.phash(pil_image)
-    
-    def get(self, roi):
-        frame_hash = self.compute_hash(roi)
-        
-        best_match = None
-        min_distance = float('inf')
-        
-        for cached_hash in self.cache:
-            distance = frame_hash - cached_hash
-            if distance < min_distance:
-                min_distance = distance
-                best_match = cached_hash
-        
-        if best_match is not None and min_distance <= self.similarity_threshold:
-            self.access_count[best_match] += 1
-            return self.cache[best_match]
-        
-        return None
-    
-    def put(self, roi, processed_result):
-        frame_hash = self.compute_hash(roi)
-        
-        if len(self.cache) >= self.cache_size:
-            least_used = min(self.access_count, key=self.access_count.get)
-            del self.cache[least_used]
-            del self.access_count[least_used]
-        
-        self.cache[frame_hash] = processed_result
-        self.access_count[frame_hash] = 1
-
-
-class FrameSkipDetector:
-    def __init__(self, keyframe_interval=5, scene_change_threshold=50.0):
-        self.keyframe_interval = keyframe_interval
-        self.scene_change_threshold = scene_change_threshold
-        self.prev_roi = None
-    
-    def should_process_frame(self, frame_index, roi):
-        is_keyframe = (frame_index % self.keyframe_interval == 0)
-        if is_keyframe:
-            return True
-        
-        if self.prev_roi is not None:
-            diff = self.calculate_frame_difference(roi, self.prev_roi)
-            if diff > self.scene_change_threshold:
-                return True
-        
-        return False
-    
-    def update_prev_roi(self, roi):
-        if roi is not None:
-            self.prev_roi = roi.copy()
-    
-    @staticmethod
-    def calculate_frame_difference(roi1, roi2):
-        if roi1 is None or roi2 is None:
-            return float('inf')
-        
-        gray1 = cv2.cvtColor(roi1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(roi2, cv2.COLOR_BGR2GRAY)
-        
-        diff = np.mean((gray1.astype("float") - gray2.astype("float")) ** 2)
-        
-        return diff
-    
 class WatermarkDetector:
-    def __init__(self, num_sample_frames=10, min_frame_count=7, dilation_kernel_size=7):
+    def __init__(self, num_sample_frames=10, min_frame_count=7, dilation_kernel_size=5):
         self.num_sample_frames = num_sample_frames
         self.min_frame_count = min_frame_count
         self.dilation_kernel_size = dilation_kernel_size
@@ -213,8 +136,17 @@ def get_video_info(video_clip):
     }
     return info
 
-def initialize_lama():
-    model = ModelManager(name="lama", device="cpu")
+def check_gpu():
+    if torch.cuda.is_available():
+        device = "cuda"
+        gpu_name = torch.cuda.get_device_name(0)
+        return True, device, gpu_name
+    else:
+        return False, "cpu", None
+
+def initialize_lama(device="cpu"):
+    model = ModelManager(name="lama", device=device)
+
     config = Config(
         ldm_steps=25,
         hd_strategy=HDStrategy.ORIGINAL,
@@ -270,9 +202,6 @@ class WatermarkProcessor:
         self.config = config
         self.roi_coords = roi_coords
         self.roi_mask = roi_mask
-        self.frame_cache = FrameCache(cache_size=100, similarity_threshold=3)
-        self.skip_detector = FrameSkipDetector(keyframe_interval=5, scene_change_threshold=50.0)
-        self.prev_processed_roi = None
     
     def extract_roi(self, frame_bgr):
         y_min, y_max, x_min, x_max = self.roi_coords
@@ -282,20 +211,8 @@ class WatermarkProcessor:
         y_min, y_max, x_min, x_max = self.roi_coords
         roi = self.extract_roi(frame_bgr)
         
-        process_this_frame = self.skip_detector.should_process_frame(frame_index, roi)
-        
-        if process_this_frame:
-            processed_roi = self.frame_cache.get(roi)
-            
-            if processed_roi is None:
-                processed_roi = lama_inpaint(roi, self.roi_mask, self.model, self.config)
-                processed_roi = cv2.cvtColor(processed_roi, cv2.COLOR_BGR2RGB)
-                self.frame_cache.put(roi, processed_roi)
-            
-            self.skip_detector.update_prev_roi(roi)
-            self.prev_processed_roi = processed_roi.copy()
-        else:
-            processed_roi = self.prev_processed_roi
+        processed_roi = lama_inpaint(roi, self.roi_mask, self.model, self.config)
+        processed_roi = cv2.cvtColor(processed_roi, cv2.COLOR_BGR2RGB)
         
         blend_mask = cv2.GaussianBlur(self.roi_mask.astype(np.float32), (21, 21), 0) / 255.0
         
@@ -317,7 +234,7 @@ def process_video(video_clip, output_path, watermark_mask, model, config):
         print("No watermark region found in mask")
         return video_info
         
-    margin = 50
+    margin = 10
     y_min, y_max = max(0, np.min(y_indices) - margin), min(video_clip.h, np.max(y_indices) + margin)
     x_min, x_max = max(0, np.min(x_indices) - margin), min(video_clip.w, np.max(x_indices) + margin)
 
@@ -366,6 +283,16 @@ if __name__ == "__main__":
     input_dir = args.input
     output_dir = args.output
     preview_enabled = args.preview
+
+    has_gpu, device, gpu_name = check_gpu()
+
+    if has_gpu:
+        print(f"GPU detected: {gpu_name}")
+        print("Using GPU for processing")
+        use_device = "cuda"
+    else:
+        print("No GPU detected, using CPU for processing")
+        use_device = "cpu"
     
     if not ensure_directory_exists(output_dir):
         sys.exit(1)
@@ -383,7 +310,7 @@ if __name__ == "__main__":
     watermark_detector = WatermarkDetector()
     watermark_mask = None
     
-    lama_model, lama_config = initialize_lama()
+    lama_model, lama_config = initialize_lama(device=use_device)
     
     for video in videos:
         print(f"Processing {video}")
@@ -401,10 +328,10 @@ if __name__ == "__main__":
         output_video_path = os.path.join(output_dir, os.path.splitext(video_name)[0])
 
         processing_info = process_video(video_clip, output_video_path, watermark_mask, lama_model, lama_config)
-        
+
         print(f"Successfully processed {video_name}")
-        print(f"  分辨率: {processing_info['video_info']['resolution']}")
-        print(f"  时长: {processing_info['video_info']['duration']}")
-        print(f"  帧率: {processing_info['video_info']['fps']}")
-        print(f"  总帧数: {processing_info['video_info']['total_frames']}")
-        print(f"  处理时间: {processing_info['processing_time']}")
+        print(f"  Resolution: {processing_info['video_info']['resolution']}")
+        print(f"  Duration: {processing_info['video_info']['duration']}")
+        print(f"  FPS: {processing_info['video_info']['fps']}")
+        print(f"  Total frames: {processing_info['video_info']['total_frames']}")
+        print(f"  Processing time: {processing_info['processing_time']}")

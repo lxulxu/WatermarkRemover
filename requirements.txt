@@ -1,8 +1,5 @@
-ImageHash==4.3.2
 lama_cleaner==1.2.5
 moviepy==2.1.2
 numpy==2.2.3
 opencv_python==4.11.0.86
-Pillow==11.1.0
-torch==2.6.0
 tqdm==4.67.1

@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
       - 安装CUDA Toolkit
 
-  	访问 [NVIDIA CUDA下载页面](https://developer.nvidia.com/cuda-downloads)，选择对应的操作系统和版本。
+  	    访问 [NVIDIA CUDA下载页面](https://developer.nvidia.com/cuda-downloads)，选择对应的操作系统和版本。
 
       - 安装cuDNN
   
@@ -58,6 +58,7 @@ pip install -r requirements.txt
       - 安装GPU版本的PyTorch
 
         访问 [PyTorch官方网站](https://pytorch.org/get-started/locally/)，选择与CUDA版本匹配的命令安装，例如：
+        
   
          ```bash
           pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126

@@ -61,7 +61,7 @@ pip install -r requirements.txt
         
   
          ```bash
-          pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+          pip3 install torch==2.6.0+cu126 torchvision==0.21.0 torchaudio==2.6.0+cu126 --index-url https://download.pytorch.org/whl/cu126
          ```
   
 
@@ -97,7 +97,7 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 1. **水印区域选择**：程序会显示视频一帧，手动框选水印区域后按**SPACE**或**ENTER**键继续。
 2. **效果预览**（可选）：显示处理效果预览，按**SPACE**或**ENTER**键确认或按**ESC**键取消退出程序。
 3. **视频处理**：初次运行程序使用LAMA模型需较长时间下载模型。
-4. **输出结果**
+4. **输出结果**:MP4格式视频
 
 ## 局限性
 
@@ -107,10 +107,26 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 
 ## 常见问题
 
-**Q: 安装CUDA后出现错误？**
- A: 确保安装的CUDA、cuDNN和PyTorch版本相互兼容。参考PyTorch官方网站的兼容性表格。
+ **Q: GPU未正确启动，程序使用CPU运行**
 
+ 运行时显示类似信息 `No GPU detected, using CPU for processing`
 
+A: 请按照 [LaMa Cleaner官方安装指南](https://lama-cleaner-docs.vercel.app/install/pip)检查你的环境配置
+
+  - 检查Python版本是否为3.10
+  - 检查已安装PyTorch版本是否有CPU版本，参考LaMa Cleaner官方网页说明
+
+  > If Lama Cleaner is not using GPU device, it might CPU version of pytorch is installed, please follow pytorch's get-started(opens in a new tab) to install GPU version.
+  
+  - 确保安装的CUDA、cuDNN和PyTorch版本和显卡兼容
+
+    > 感谢[@VitorX](https://github.com/VitorX)在[#issue11](https://github.com/lxulxu/WatermarkRemover/issues/11#issuecomment-3422248098)中提供的安装步骤
+
+    - 查询[NVIDIA CUDA兼容性页面](https://en.wikipedia.org/wiki/CUDA#GPUs_supported)选择对应的CUDA版本
+    - 查询[cuDNN官方页面](developer.nvidia.com/rdp/cudnn-archive)选择对应的cuDNN版本
+    - 查询[PyTorch官方页面](https://pytorch.org/get-started/locally/)选择对应PyTorch版本
+
+  程序正确检测到GPU会输出`GPU detected: NVIDIA XXX Using GPU for processing `提示信息
 
 ## Star History
 

@@ -97,7 +97,7 @@ python watermark_remover.py --input /path/to/videos --output /path/to/output --p
 1. **水印区域选择**：程序会显示视频一帧，手动框选水印区域后按**SPACE**或**ENTER**键继续。
 2. **效果预览**（可选）：显示处理效果预览，按**SPACE**或**ENTER**键确认或按**ESC**键取消退出程序。
 3. **视频处理**：初次运行程序使用LAMA模型需较长时间下载模型。
-4. **输出结果**:MP4格式视频
+4. **输出结果**： MP4格式视频
 
 ## 局限性
 

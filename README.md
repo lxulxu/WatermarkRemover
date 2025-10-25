@@ -116,7 +116,7 @@ A: 请按照 [LaMa Cleaner官方安装指南](https://lama-cleaner-docs.vercel.a
   - 检查Python版本是否为3.10
   - 检查已安装PyTorch版本是否有CPU版本，参考LaMa Cleaner官方网页说明
 
-  > If Lama Cleaner is not using GPU device, it might CPU version of pytorch is installed, please follow pytorch's get-started(opens in a new tab) to install GPU version.
+    > If Lama Cleaner is not using GPU device, it might CPU version of pytorch is installed, please follow pytorch's get-started(opens in a new tab) to install GPU version.
   
   - 确保安装的CUDA、cuDNN和PyTorch版本和显卡兼容
 

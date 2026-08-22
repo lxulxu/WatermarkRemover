@@ -127,3 +127,10 @@ A: 请按照 [LaMa Cleaner官方安装指南](https://lama-cleaner-docs.vercel.a
     - 查询[PyTorch官方页面](https://pytorch.org/get-started/locally/)选择对应PyTorch版本
 
   程序正确检测到GPU会输出`GPU detected: NVIDIA XXX Using GPU for processing `提示信息
+
+## Star History
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/shieldcn/star-chart-dark.svg">
+  <img alt="Star History" src=".github/shieldcn/star-chart-light.svg">
+</picture>

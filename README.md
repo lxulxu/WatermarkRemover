@@ -131,6 +131,6 @@ A: 请按照 [LaMa Cleaner官方安装指南](https://lama-cleaner-docs.vercel.a
 ## Star History
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/shieldcn/star-chart-dark.svg">
-  <img alt="Star History" src=".github/shieldcn/star-chart-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lxulxu/WatermarkRemover/star-chart/star-chart-dark.svg">
+  <img alt="Star History" src="https://raw.githubusercontent.com/lxulxu/WatermarkRemover/star-chart/star-chart-light.svg">
 </picture>

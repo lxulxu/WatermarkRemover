@@ -13,6 +13,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jal-co/shieldcn@v1
+
+      - name: Render star chart
+        uses: jal-co/shieldcn@v1
         with:
           theme: violet
+          commit: false
+          output: star-chart.svg
+
+      - name: Publish to orphan branch
+        run: |
+          mkdir -p /tmp/star-chart-out
+          cp star-chart-dark.svg star-chart-light.svg /tmp/star-chart-out/
+
+          git config user.name "shieldcn[bot]"
+          git config user.email "shieldcn[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin star-chart; then
+            git fetch origin star-chart
+            git checkout -B star-chart origin/star-chart
+          else
+            git checkout --orphan star-chart
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp /tmp/star-chart-out/*.svg .
+          git add star-chart-dark.svg star-chart-light.svg
+          if git diff --cached --quiet; then
+            echo "Star chart unchanged — nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: update star chart [skip ci]"
+          git push -u origin star-chart

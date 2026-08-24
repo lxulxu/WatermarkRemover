@@ -14,18 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Render star chart
-        uses: jal-co/shieldcn@v1
-        with:
-          theme: violet
-          commit: false
-          output: star-chart.svg
-
-      - name: Publish to orphan branch
+      - name: Switch to star-chart branch
         run: |
-          mkdir -p /tmp/star-chart-out
-          cp star-chart-dark.svg star-chart-light.svg /tmp/star-chart-out/
-
           git config user.name "shieldcn[bot]"
           git config user.email "shieldcn[bot]@users.noreply.github.com"
 
@@ -37,7 +27,15 @@ jobs:
             git rm -rf . >/dev/null 2>&1 || true
           fi
 
-          cp /tmp/star-chart-out/*.svg .
+      - name: Render star chart
+        uses: jal-co/shieldcn@v1
+        with:
+          theme: violet
+          commit: false
+          output: star-chart.svg
+
+      - name: Commit and push
+        run: |
           git add star-chart-dark.svg star-chart-light.svg
           if git diff --cached --quiet; then
             echo "Star chart unchanged — nothing to commit."
